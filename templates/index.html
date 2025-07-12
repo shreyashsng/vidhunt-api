@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎯 VidFast .m3u8 Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      function showLoader() {
+        document.getElementById("submitBtn").disabled = true;
+        document.getElementById("loading").classList.remove("hidden");
+      }
+
+      window.onload = () => {
+        const resultDiv = document.querySelector(".mt-6");
+        if (resultDiv) {
+          resultDiv.scrollIntoView({ behavior: "smooth" });
+        }
+      };
+    </script>
+  </head>
+  <body
+    class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-6"
+  >
+
+    {% block content %}
+    <div class="bg-white shadow-xl rounded-2xl p-8 w-full max-w-xl text-center">
+      <h1 class="text-3xl font-bold text-blue-700 mb-4">🎯 VidHunt API</h1>
+      <p class="mb-6 text-gray-700">A simple API to fetch .m3u8 URLs for movies by TMDB ID.<br>Use the endpoints with your API key.</p>
+      <div class="flex flex-col items-center gap-2 mb-4">
+        <a href="/login" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Login</a>
+        <a href="/register" class="bg-gray-200 text-blue-700 px-4 py-2 rounded hover:bg-gray-300">Register</a>
+        {% if username %}
+          <a href="{% if is_admin %}/admin{% else %}/dashboard{% endif %}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Dashboard</a>
+        {% endif %}
+      </div>
+      <div class="mt-6 text-xs text-gray-500">
+        <p>API Endpoint Example:</p>
+        <code>GET /api/movie/&lt;tmdb_id&gt;?api_key=YOUR_API_KEY</code>
+      </div>
+    </div>
+    {% endblock %}
+
+    <style>
+      .loader {
+        border-top-color: #3498db;
+        animation: spin 1s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      input:read-only {
+        background-color: #f0fdf4;
+        cursor: pointer;
+      }
+      input:read-only:active,
+      input:read-only:focus {
+        outline: 2px solid #22c55e;
+        background-color: #dcfce7;
+      }
+      button:active {
+        transform: scale(0.97);
+      }
+    </style>
+  </body>
+</html>

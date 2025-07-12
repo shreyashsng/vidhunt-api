@@ -1,0 +1,92 @@
+[
+  {
+    "path": "/",
+    "methods": ["GET", "POST"],
+    "description": "Home page, user dashboard if logged in."
+  },
+  {
+    "path": "/register",
+    "methods": ["GET", "POST"],
+    "description": "User registration (supports JSON and HTML)."
+  },
+  {
+    "path": "/verify-otp",
+    "methods": ["GET", "POST"],
+    "description": "OTP verification after registration (JSON and HTML)."
+  },
+  {
+    "path": "/login",
+    "methods": ["GET", "POST"],
+    "description": "User login (supports JSON and HTML)."
+  },
+  {
+    "path": "/dashboard",
+    "methods": ["GET"],
+    "description": "User dashboard (HTML)."
+  },
+  {
+    "path": "/logout",
+    "methods": ["GET"],
+    "description": "Logout user (HTML)."
+  },
+  {
+    "path": "/api/movie/<tmdb_id>",
+    "methods": ["GET"],
+    "description": "Get m3u8 URL for a movie by TMDB ID. Requires API key or JWT."
+  },
+  {
+    "path": "/admin/change-plan",
+    "methods": ["POST"],
+    "description": "Admin: Change user plan."
+  },
+  {
+    "path": "/api/all",
+    "methods": ["GET"],
+    "description": "Get all cached movie URLs. Requires API key or JWT."
+  },
+  {
+    "path": "/api/health",
+    "methods": ["GET"],
+    "description": "API health check."
+  },
+  {
+    "path": "/api/status",
+    "methods": ["GET"],
+    "description": "API status/version."
+  },
+  {
+    "path": "/api/user/regenerate-key",
+    "methods": ["POST"],
+    "description": "Regenerate API key for logged-in user."
+  },
+  {
+    "path": "/admin",
+    "methods": ["GET", "POST"],
+    "description": "Admin panel (HTML)."
+  },
+  {
+    "path": "/api/token",
+    "methods": ["POST"],
+    "description": "JWT login endpoint (returns JWT token)."
+  },
+  {
+    "path": "/api/token_authlib",
+    "methods": ["POST"],
+    "description": "Authlib JWT login endpoint (returns Authlib JWT)."
+  },
+  {
+    "path": "/forgot-password",
+    "methods": ["GET", "POST"],
+    "description": "Request password reset link (HTML)."
+  },
+  {
+    "path": "/reset-password",
+    "methods": ["GET", "POST"],
+    "description": "Reset password using token (HTML)."
+  },
+  {
+    "path": "/openapi.json",
+    "methods": ["GET"],
+    "description": "Serve OpenAPI spec for frontend."
+  }
+]

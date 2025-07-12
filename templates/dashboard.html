@@ -1,0 +1,55 @@
+{% extends "index.html" %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh]">
+  <div class="bg-white shadow-2xl rounded-3xl p-10 w-full max-w-lg border-t-8 border-blue-600">
+    <h2 class="text-2xl font-bold text-blue-700 mb-2 text-center">Welcome, <span class="text-gray-900">{{ username }}</span>!</h2>
+  <div class="my-6 flex justify-between items-center">
+    <a href="/logout" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Logout</a>
+      <label class="block text-gray-700 font-semibold mb-1">Your API Key:</label>
+      <div class="flex items-center gap-2">
+        <input id="apiKeyInput" type="text" readonly value="{{ api_key }}" class="w-full px-3 py-2 rounded-lg bg-blue-50 border border-blue-300 text-blue-700 font-mono text-sm select-all focus:outline-none focus:ring-2 focus:ring-blue-400" onclick="this.select()" />
+        <button onclick="navigator.clipboard.writeText(document.getElementById('apiKeyInput').value)" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Copy</button>
+        <button id="regenBtn" onclick="regenerateApiKey()" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Regenerate</button>
+      </div>
+      <div id="regenStatus" class="text-xs text-gray-500 mt-1"></div>
+      <script>
+        function regenerateApiKey() {
+          const btn = document.getElementById('regenBtn');
+          btn.disabled = true;
+          fetch('/api/user/regenerate-key', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+              if (data.api_key) {
+                document.getElementById('apiKeyInput').value = data.api_key;
+                document.getElementById('regenStatus').textContent = 'API key regenerated!';
+              } else {
+                document.getElementById('regenStatus').textContent = data.message || 'Error regenerating key.';
+              }
+              btn.disabled = false;
+            })
+            .catch(() => {
+              document.getElementById('regenStatus').textContent = 'Error regenerating key.';
+              btn.disabled = false;
+            });
+        }
+      </script>
+    </div>
+    <div class="mb-4 p-4 bg-green-50 border-l-4 border-green-400 rounded">
+      <div class="mb-1"><strong>Plan:</strong> {{ plan|capitalize }}</div>
+      <div><strong>Requests today:</strong> {{ requests_today }} / {{ plan_limit }}</div>
+    </div>
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-xl mb-6">
+      <h3 class="font-semibold text-blue-800 mb-1">How to use the API:</h3>
+      <p class="text-gray-700 text-sm mb-2">You can now access movie data using your API key.</p>
+      <div class="bg-white border border-blue-200 rounded-lg p-2 text-xs font-mono text-blue-700 mb-2 overflow-x-auto">
+        http://localhost:5000/api/movie/&lt;tmdbId&gt;?api_key={{ api_key }}
+      </div>
+      <ul class="list-disc pl-5 text-gray-600 text-xs">
+        <li>Replace <span class="font-mono">&lt;tmdbId&gt;</span> with the TMDB movie ID you want to query.</li>
+        <li>Keep your API key <span class="text-red-600 font-semibold">secret</span>!</li>
+      </ul>
+    </div>
+    <a href="/" class="block text-center text-blue-600 underline hover:text-blue-800 mt-4">&#8592; Back to Home</a>
+  </div>
+</div>
+{% endblock %}

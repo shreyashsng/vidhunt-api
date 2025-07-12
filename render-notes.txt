@@ -1,0 +1,16 @@
+# Alternative deployment method if Playwright fails
+
+# Step 1: Use render.yaml for better control
+build:
+  - pip install -r requirements.txt
+  - playwright install-deps
+  - playwright install chromium
+
+# Step 2: Environment variables needed:
+PYTHON_VERSION=3.11.9
+PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright
+
+# Step 3: If Playwright still fails, you can:
+# 1. Use render-build.sh instead of build.sh
+# 2. Try the Docker deployment option
+# 3. Contact Render support for Playwright-specific help

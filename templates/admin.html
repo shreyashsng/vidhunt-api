@@ -1,0 +1,109 @@
+{% extends "index.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto mt-10 px-4">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold text-blue-600">Admin Panel</h2>
+    <div class="flex gap-2">
+      <a href="/admin/movies" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm">View Cached Movies</a>
+      <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm">Logout</a>
+    </div>
+  </div>
+  {% if total_pages > 1 %}
+  <div class="flex justify-center mt-6">
+    <nav class="inline-flex rounded-md shadow-sm" aria-label="Pagination">
+      {% for p in range(1, total_pages+1) %}
+        {% if p == page %}
+          <span class="bg-blue-600 text-white px-3 py-1 border border-blue-600">{{ p }}</span>
+        {% else %}
+          <a href="{{ url_for('routes.admin_panel', page=p) }}" class="bg-white text-blue-600 hover:bg-blue-50 px-3 py-1 border border-gray-300">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+  </div>
+  {% endif %}
+
+  <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md text-sm text-slate-700">
+    <b>API Endpoints:</b>
+    <div class="mt-1">
+      <code>POST /register</code>, <code>POST /login</code>, <code>GET /dashboard</code>,
+      <code>POST /api/user/regenerate-key</code>,<br>
+      <code>GET /api/movie/&lt;tmdb_id&gt;?api_key=...</code>, <code>GET /api/all?api_key=...</code>, 
+      <code>GET /api/health</code>, <code>GET /api/status</code>, <code>GET /admin</code>, 
+      <code>POST /admin</code>
+    </div>
+  </div>
+
+  <!-- Scrape TMDB ID Form -->
+  <div class="mb-8 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-md flex items-center gap-4">
+    <form method="post" action="/api/movie/manual" class="flex items-center gap-2 w-full">
+      <label for="tmdb_id" class="font-semibold text-yellow-700">Scrape by TMDB ID:</label>
+      <input type="number" min="1" name="tmdb_id" id="tmdb_id" required class="border border-gray-300 rounded-md px-2 py-1 w-32" placeholder="TMDB ID">
+      <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded-md">Scrape</button>
+    </form>
+    <span class="text-xs text-gray-500">(Scrape and cache a movie by TMDB ID instantly)</span>
+  </div>
+
+  <!-- Placeholder for future frontend app integration -->
+  <div id="frontend-app-root" class="mb-8 p-4 bg-slate-50 border border-dashed border-slate-300 rounded text-slate-500 text-center">
+    <em>Future: Frontend React/Vue/SPA app can mount here.</em>
+  </div>
+  <div class="overflow-x-auto rounded-lg shadow-md">
+    <table class="min-w-full bg-white text-sm text-left">
+      <thead class="bg-gray-100 text-gray-700 sticky top-0">
+        <tr>
+          <th class="px-4 py-3 font-semibold">ID</th>
+          <th class="px-4 py-3 font-semibold">Name</th>
+          <th class="px-4 py-3 font-semibold">Email</th>
+          <th class="px-4 py-3 font-semibold">Created</th>
+          <th class="px-4 py-3 font-semibold">API Key</th>
+          <th class="px-4 py-3 font-semibold">Plan</th>
+          <th class="px-4 py-3 font-semibold">Usage</th>
+          <th class="px-4 py-3 font-semibold">Admin</th>
+          <th class="px-4 py-3 font-semibold">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr class="border-t">
+          <td class="px-4 py-3">{{ user['id'] }}</td>
+          <td class="px-4 py-3">{{ user['name'] }}</td>
+          <td class="px-4 py-3">{{ user['email'] }}</td>
+          <td class="px-4 py-3">{{ user['account_created_at'] or '-' }}</td>
+          <td class="px-4 py-3 font-mono break-all text-xs">{{ user['api_key'] }}</td>
+          <td class="px-4 py-3 capitalize">{{ user['plan'] }}</td>
+          <td class="px-4 py-3">{{ user['requests_today'] }} / {{ plan_limits[user['plan']] }}</td>
+          <td class="px-4 py-3">
+            {% if user['is_admin'] %}
+              <span class="text-green-600 font-semibold">Yes</span>
+            {% else %}
+              <span class="text-red-500">No</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 space-y-2">
+            <!-- Regenerate Key -->
+            <form method="post">
+              <input type="hidden" name="user_id" value="{{ user['id'] }}">
+              <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-md">
+                Regenerate
+              </button>
+            </form>
+            <!-- Change Plan -->
+            <form method="post" action="/admin/change-plan" class="flex items-center space-x-2 mt-1">
+              <input type="hidden" name="user_id" value="{{ user['id'] }}">
+              <select name="plan" class="border border-gray-300 rounded-md px-2 py-1 text-sm">
+                {% for p in plan_limits.keys() %}
+                  <option value="{{ p }}" {% if user['plan'] == p %}selected{% endif %}>{{ p|capitalize }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm">
+                Change
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

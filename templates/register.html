@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+    <h2 class="text-2xl font-bold mb-6 text-center">Register</h2>
+    {% if error %}
+      <p class="text-red-600 mb-4">{{ error }}</p>
+    {% endif %}
+    {% if message %}
+      <p class="text-green-600 mb-4">{{ message }}</p>
+    {% endif %}
+    <form method="POST">
+      <label class="block mb-2 font-medium">Name</label>
+      <input type="text" name="name" required class="w-full mb-4 px-4 py-2 border rounded">
+
+      <label class="block mb-2 font-medium">Email</label>
+      <input type="email" name="email" required class="w-full mb-4 px-4 py-2 border rounded">
+
+      <label class="block mb-2 font-medium">Password</label>
+      <input type="password" name="password" required class="w-full mb-6 px-4 py-2 border rounded">
+
+      <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Register</button>
+    </form>
+    <p class="mt-4 text-sm text-center">
+      Already have an account?
+      <a href="/login" class="text-blue-500 hover:underline">Login here</a>
+    </p>
+  </div>
+</body>
+</html>
