@@ -5,7 +5,7 @@ from flask_jwt_extended import (
 )
 from authlib.jose import jwt as authlib_jwt, JoseError
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 import os, secrets
 
 from database import get_all_users, PLAN_LIMITS
@@ -134,53 +134,78 @@ def register():
         from utils import send_otp_email
         try:
             send_otp_email(email, name, otp_code)
+            flash(f"Registration successful! OTP sent to {email}. Please check your email.", "success")
         except Exception as e:
-            print(f"[WARNING] Could not send OTP email: {e}")
+            print(f"[ERROR] Could not send OTP email: {e}")
+            flash(f"Registration successful! However, email could not be sent. Your OTP is: {otp_code}", "warning")
+        
         if request.is_json:
             return jsonify({"status": "success", "message": "Registered. Please verify OTP.", "email": email}), 201
         # Show OTP on next page
         return redirect(url_for("routes.verify_otp", email=email))
     return render_template("register.html")
 
-# OTP verification route (supports HTML and JSON, uses email)
 @routes.route("/verify-otp", methods=["GET", "POST"])
 def verify_otp():
+    # Get email from form data or URL parameter
+    email = request.form.get("email") if request.method == "POST" else request.args.get("email")
+    
+    if not email:
+        flash("Email is required for verification.", "error")
+        return redirect(url_for("routes.register"))
+    
     if request.method == "POST":
-        if request.is_json:
-            data = request.get_json()
-            email = data.get("email")
-            otp_code = data.get("otp_code")
-        else:
-            email = request.form.get("email")
-            otp_code = request.form.get("otp_code")
+        otp_code = request.form.get("otp_code")
+        
+        if not otp_code:
+            flash("Please enter the OTP code.", "error")
+            return render_template("verify_otp.html", email=email)
+        
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
-        if user and user["otp_code"] == otp_code:
-            if datetime.utcnow() <= datetime.fromisoformat(user["otp_expires_at"]):
-                cur.execute("UPDATE users SET is_verified = 1, otp_code = NULL, otp_expires_at = NULL WHERE email = %s", (email,))
+        
+        if not user:
+            conn.close()
+            flash("User not found. Please register again.", "error")
+            return redirect(url_for("routes.register"))
+        
+        if user["otp_code"] == otp_code:
+            # Fix: Use safe datetime parsing
+            from utils import safe_datetime_parse
+            otp_expires_at = safe_datetime_parse(user["otp_expires_at"])
+            
+            if otp_expires_at and datetime.utcnow() <= otp_expires_at:
+                cur.execute("UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expires_at = NULL WHERE email = %s", (email,))
                 conn.commit()
+                
+                # Automatically log in the user after successful verification
+                session.permanent = True
+                session["user_id"] = user["id"]
+                session["username"] = user["name"]
+                
                 conn.close()
-                msg = "Verification successful! You can now log in."
+                msg = "Verification successful! Welcome to your dashboard."
                 if request.is_json:
-                    return jsonify({"status": "success", "message": msg, "verified": True}), 200
+                    return jsonify({"status": "success", "message": msg, "verified": True, "redirect": "/dashboard"}), 200
                 flash(msg, "success")
-                return redirect(url_for("routes.login"))
+                # Redirect to dashboard instead of login
+                return redirect(url_for("routes.dashboard"))
             else:
                 msg = "OTP expired. Please register again."
                 if request.is_json:
                     return jsonify({"status": "error", "message": msg, "verified": False}), 400
-                flash(msg, "danger")
+                flash(msg, "error")
         else:
-            msg = "Invalid OTP."
+            msg = "Invalid OTP code. Please try again."
             if request.is_json:
                 return jsonify({"status": "error", "message": msg, "verified": False}), 400
-            flash(msg, "danger")
+            flash(msg, "error")
+        
         conn.close()
-        if not request.is_json:
-            return render_template("verify_otp.html", email=email)
-    email = request.form.get("email") if request.method == "POST" else request.args.get("email")
+        return render_template("verify_otp.html", email=email)
+    
     return render_template("verify_otp.html", email=email)
 
 
@@ -197,10 +222,17 @@ def login():
             email = data.get("email")
             password = data.get("password")
         else:
-            email = request.form["email"]
-            password = request.form["password"]
+            email = request.form.get("email")
+            password = request.form.get("password")
+        
+        if not email or not password:
+            msg = "Email and password are required."
+            flash(msg, "error")
+            return render_template("login.html", forgot_password_url=url_for("routes.forgot_password"))
+        
         from database import get_user_by_email
         user = get_user_by_email(email)
+        
         from werkzeug.security import check_password_hash
         if user and check_password_hash(user["password_hash"], password):
             if not user["is_verified"]:
@@ -209,11 +241,15 @@ def login():
                     return jsonify({"status": "error", "message": msg, "need_verification": True}), 403
                 flash(msg, "error")
                 return redirect(url_for("routes.verify_otp", email=email))
+            
+            # Set session
             session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["name"]
+            
             if request.is_json:
                 return jsonify({"status": "success", "message": "Login successful.", "isAdmin": user["is_admin"]}), 200
+            
             flash("Login successful.", "success")
             if user["is_admin"]:
                 return redirect(url_for("routes.admin_panel"))
@@ -223,8 +259,8 @@ def login():
             msg = "Invalid credentials."
             if request.is_json:
                 return jsonify({"status": "error", "message": msg}), 401
-            flash(msg, "danger")
-            return redirect(url_for("routes.login"))
+            flash(msg, "error")
+            return render_template("login.html", forgot_password_url=url_for("routes.forgot_password"))
     # Add forgot password link
     return render_template("login.html", forgot_password_url=url_for("routes.forgot_password"))
 
@@ -233,12 +269,22 @@ def login():
 @routes.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
+        flash("Please log in to access your dashboard.", "error")
         return redirect(url_for("routes.login"))
+    
     user = get_user_by_id(session["user_id"])
+    
+    if not user:
+        flash("User not found. Please log in again.", "error")
+        session.clear()
+        return redirect(url_for("routes.login"))
+    
     from database import PLAN_LIMITS
     plan = user["plan"]
     requests_today = user["requests_today"]
     plan_limit = PLAN_LIMITS.get(plan, 100)
+    
+    print(f"[DEBUG] Rendering dashboard for user: {user['name']}")
     return render_template(
         "dashboard.html",
         username=user["name"],
@@ -256,18 +302,25 @@ def logout():
 
 @routes.route("/api/movie/<tmdb_id>")
 def api_movie(tmdb_id):
+    print(f"📡 [API] Movie API request received for TMDB ID: {tmdb_id}")
+    print(f"⏰ [API] Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
     # Allow API key, Flask-JWT-Extended, or Authlib JWT
     user = None
     api_key = request.args.get("api_key")
     if api_key:
+        print(f"🔑 [API] API key authentication attempted")
         if not is_valid_api_key(api_key):
+            print(f"❌ [API] Invalid API key")
             return jsonify({"status": "error", "message": "Invalid or missing API key"}), 401
+        print(f"✅ [API] Valid API key")
         from database import get_db_connection
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
         user = cur.fetchone()
         conn.close()
+        print(f"👤 [API] User found via API key: {user['email'] if user else 'None'}")
     else:
         # Try Flask-JWT-Extended first
         from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
@@ -304,22 +357,56 @@ def api_movie(tmdb_id):
         }), 429
 
     if not tmdb_id.isdigit():
+        print(f"❌ [API] Invalid TMDB ID format: {tmdb_id}")
         return jsonify({"status": "error", "message": "Invalid TMDB ID"}), 400
 
+    print(f"🔍 [API] Checking cache for TMDB ID: {tmdb_id}")
     cached = get_m3u8_url(tmdb_id)
     if cached:
-        return jsonify({"status": "cached", "tmdb_id": tmdb_id, "m3u8_url": cached}), 200
+        print(f"💾 [API] Found cached URL: {cached}")
+        from utils import get_utc_now_iso
+        return jsonify({
+            "status": "cached", 
+            "tmdb_id": tmdb_id, 
+            "m3u8_url": cached,
+            "timestamp": get_utc_now_iso()
+        }), 200
 
+    print(f"🆕 [API] No cache found, starting fresh scrape...")
     try:
         url = f"{SCRAPE_BASE_URL}/movie/{tmdb_id}"
+        print(f"🌐 [API] Constructed URL: {url}")
+        print(f"🚀 [API] Calling scraper...")
         m3u8 = scrape_m3u8_url(url)
         if m3u8:
+            print(f"✅ [API] Scrape successful: {m3u8}")
+            print(f"💾 [API] Saving to cache...")
             save_url(tmdb_id, m3u8)
-            return jsonify({"status": "scraped", "tmdb_id": tmdb_id, "m3u8_url": m3u8}), 200
+            print(f"✅ [API] Saved to cache successfully")
+            from utils import get_utc_now_iso
+            return jsonify({
+                "status": "scraped", 
+                "tmdb_id": tmdb_id, 
+                "m3u8_url": m3u8,
+                "timestamp": get_utc_now_iso()
+            }), 200
         else:
-            return jsonify({"status": "error", "message": "No .m3u8 URL found"}), 404
+            print(f"❌ [API] Scrape failed - no .m3u8 URL found")
+            from utils import get_utc_now_iso
+            return jsonify({
+                "status": "error", 
+                "message": "No .m3u8 URL found",
+                "timestamp": get_utc_now_iso()
+            }), 404
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"💥 [API] Exception during scrape: {e}")
+        print(f"💥 [API] Exception type: {type(e).__name__}")
+        from utils import get_utc_now_iso
+        return jsonify({
+            "status": "error", 
+            "message": str(e),
+            "timestamp": get_utc_now_iso()
+        }), 500
 # Admin: change user plan
 @routes.route("/admin/change-plan", methods=["POST"])
 def admin_change_plan():
@@ -412,6 +499,15 @@ def admin_panel():
             flash(f"API key regenerated for user ID {target_user_id}", "success")
 
     users = get_all_users() or []
+    
+    # Fix: Format datetime fields properly for display
+    from utils import format_datetime_for_display
+    for user in users:
+        if 'account_created_at' in user:
+            user['account_created_at'] = format_datetime_for_display(user['account_created_at'])
+        if 'last_request_date' in user:
+            user['last_request_date'] = format_datetime_for_display(user['last_request_date'])
+    
     page = request.args.get("page", 1, type=int)
     per_page = 10
     total = len(users)
@@ -552,31 +648,61 @@ def openapi_spec():
 # Admin manual scrape by TMDB ID
 @routes.route("/api/movie/manual", methods=["POST"])
 def admin_scrape_tmdb():
+    print(f"🔑 [ADMIN] Admin scrape request received")
+    
     if "user_id" not in session:
+        print(f"❌ [ADMIN] No user session found")
         return redirect(url_for("routes.login"))
+        
     user = get_user_by_id(session["user_id"])
     if not user or not user["is_admin"]:
+        print(f"❌ [ADMIN] User not admin or not found: {user}")
         return "Forbidden", 403
+        
+    print(f"✅ [ADMIN] Admin user verified: {user['email']}")
+    
     tmdb_id = request.form.get("tmdb_id")
+    print(f"📝 [ADMIN] TMDB ID received: {tmdb_id}")
+    
     if not tmdb_id or not tmdb_id.isdigit():
+        print(f"❌ [ADMIN] Invalid TMDB ID format")
         flash("Invalid TMDB ID.", "error")
         return redirect(url_for("routes.admin_panel"))
+        
+    print(f"🔍 [ADMIN] Checking cache for TMDB ID: {tmdb_id}")
+    
     # Check cache first
     cached = get_m3u8_url(tmdb_id)
     if cached:
+        print(f"💾 [ADMIN] Found cached URL: {cached}")
         flash(f".m3u8 already cached for TMDB ID {tmdb_id}.", "info")
         return redirect(url_for("routes.admin_panel"))
+        
+    print(f"🆕 [ADMIN] No cache found, starting fresh scrape...")
+    
     # Scrape and cache
     try:
         url = f"{SCRAPE_BASE_URL}/movie/{tmdb_id}"
+        print(f"🌐 [ADMIN] Constructed URL: {url}")
+        print(f"🚀 [ADMIN] Calling scraper...")
+        
         m3u8 = scrape_m3u8_url(url)
+        
         if m3u8:
+            print(f"✅ [ADMIN] Scrape successful: {m3u8}")
+            print(f"💾 [ADMIN] Saving to cache...")
             save_url(tmdb_id, m3u8)
+            print(f"✅ [ADMIN] Saved to cache successfully")
             flash(f"Scraped and cached .m3u8 for TMDB ID {tmdb_id}.", "success")
         else:
+            print(f"❌ [ADMIN] Scrape failed - no .m3u8 URL found")
             flash("No .m3u8 URL found for this TMDB ID.", "error")
     except Exception as e:
+        print(f"💥 [ADMIN] Exception during scrape: {e}")
+        print(f"💥 [ADMIN] Exception type: {type(e).__name__}")
         flash(f"Error scraping: {e}", "error")
+        
+    print(f"🔄 [ADMIN] Redirecting back to admin panel")
     return redirect(url_for("routes.admin_panel"))
 
 # Admin: view all cached TMDB IDs and m3u8 URLs

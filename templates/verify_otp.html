@@ -8,15 +8,30 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
   <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
     <h2 class="text-2xl font-bold mb-6 text-center">Verify Your Account</h2>
-    {% if otp_code %}
-      <p class="text-green-600 mb-4">Your OTP code (for dev): <strong>{{ otp_code }}</strong></p>
+    {% if email %}
+      <p class="text-gray-600 mb-4 text-center">We sent a 6-digit verification code to:<br><strong>{{ email }}</strong></p>
     {% endif %}
+    {% if otp_code %}
+      <p class="text-green-600 mb-4 text-center">Your OTP code (for testing): <strong>{{ otp_code }}</strong></p>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-4 p-3 rounded {% if category == 'success' %}bg-green-100 text-green-700{% elif category == 'warning' %}bg-yellow-100 text-yellow-700{% else %}bg-red-100 text-red-700{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
     <form method="POST">
       <input type="hidden" name="email" value="{{ email }}">
-      <label class="block mb-2 font-medium">Enter OTP</label>
-      <input type="text" name="otp_code" required class="w-full mb-6 px-4 py-2 border rounded">
-      <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Verify</button>
+      <label class="block mb-2 font-medium">Enter 6-digit OTP Code</label>
+      <input type="text" name="otp_code" required maxlength="6" pattern="[0-9]{6}" placeholder="123456" class="w-full mb-6 px-4 py-2 border rounded text-center text-lg font-mono">
+      <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Verify & Continue to Dashboard</button>
     </form>
+    <p class="mt-4 text-sm text-center text-gray-500">
+      Didn't receive the code? <a href="/register" class="text-blue-600 hover:underline">Register again</a>
+    </p>
   </div>
 </body>
 </html>
