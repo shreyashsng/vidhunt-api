@@ -302,111 +302,117 @@ def logout():
 
 @routes.route("/api/movie/<tmdb_id>")
 def api_movie(tmdb_id):
-    print(f"📡 [API] Movie API request received for TMDB ID: {tmdb_id}")
-    print(f"⏰ [API] Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-    # Allow API key, Flask-JWT-Extended, or Authlib JWT
-    user = None
-    api_key = request.args.get("api_key")
-    if api_key:
-        print(f"🔑 [API] API key authentication attempted")
-        if not is_valid_api_key(api_key):
-            print(f"❌ [API] Invalid API key")
-            return jsonify({"status": "error", "message": "Invalid or missing API key"}), 401
-        print(f"✅ [API] Valid API key")
-        from database import get_db_connection
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
-        user = cur.fetchone()
-        conn.close()
-        print(f"👤 [API] User found via API key: {user['email'] if user else 'None'}")
-    else:
-        # Try Flask-JWT-Extended first
-        from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-        try:
-            verify_jwt_in_request()
-            identity = get_jwt_identity()
-            user = get_user_by_id(identity["id"])
-        except Exception:
-            # Try Authlib JWT (from Authorization: Bearer ...)
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                token = auth_header.split(" ", 1)[1]
-                claims = decode_authlib_jwt(token)
-                if claims:
-                    user = get_user_by_id(claims["sub"])
-                else:
-                    return jsonify({"status": "error", "message": "Invalid or expired Authlib JWT"}), 401
-            else:
-                return jsonify({"status": "error", "message": "Missing authentication"}), 401
-
-    # Require verified user for API access
-    if not user or not user["is_verified"]:
-        return jsonify({"status": "error", "message": "Account not verified. Please complete OTP verification."}), 403
-
-    # Rate limiting
-    allowed, plan_limit = check_and_increment_rate_limit(user)
-    if not allowed:
-        return jsonify({
-            "status": "error",
-            "message": f"You have reached your daily quota for the '{user['plan']}' plan (limit: {plan_limit} requests per day). Please try again tomorrow or upgrade your plan.",
-            "plan": user["plan"],
-            "limit": plan_limit,
-            "requests_today": user["requests_today"]
-        }), 429
-
-    if not tmdb_id.isdigit():
-        print(f"❌ [API] Invalid TMDB ID format: {tmdb_id}")
-        return jsonify({"status": "error", "message": "Invalid TMDB ID"}), 400
-
-    print(f"🔍 [API] Checking cache for TMDB ID: {tmdb_id}")
-    cached = get_m3u8_url(tmdb_id)
-    if cached:
-        print(f"💾 [API] Found cached URL: {cached}")
-        from utils import get_utc_now_iso
-        return jsonify({
-            "status": "cached", 
-            "tmdb_id": tmdb_id, 
-            "m3u8_url": cached,
-            "timestamp": get_utc_now_iso()
-        }), 200
-
-    print(f"🆕 [API] No cache found, starting fresh scrape...")
     try:
-        url = f"{SCRAPE_BASE_URL}/movie/{tmdb_id}"
-        print(f"🌐 [API] Constructed URL: {url}")
-        print(f"🚀 [API] Calling scraper...")
-        m3u8 = scrape_m3u8_url(url)
-        if m3u8:
-            print(f"✅ [API] Scrape successful: {m3u8}")
-            print(f"💾 [API] Saving to cache...")
-            save_url(tmdb_id, m3u8)
-            print(f"✅ [API] Saved to cache successfully")
+        print(f"📡 [API] Movie API request received for TMDB ID: {tmdb_id}")
+        print(f"⏰ [API] Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Allow API key, Flask-JWT-Extended, or Authlib JWT
+        user = None
+        api_key = request.args.get("api_key")
+        if api_key:
+            print(f"🔑 [API] API key authentication attempted")
+            if not is_valid_api_key(api_key):
+                print(f"❌ [API] Invalid API key")
+                return jsonify({"status": "error", "message": "Invalid or missing API key"}), 401
+            print(f"✅ [API] Valid API key")
+            from database import get_db_connection
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
+            user = cur.fetchone()
+            conn.close()
+            print(f"👤 [API] User found via API key: {user['email'] if user else 'None'}")
+        else:
+            # Try Flask-JWT-Extended first
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            try:
+                verify_jwt_in_request()
+                identity = get_jwt_identity()
+                user = get_user_by_id(identity["id"])
+            except Exception:
+                # Try Authlib JWT (from Authorization: Bearer ...)
+                auth_header = request.headers.get("Authorization", "")
+                if auth_header.startswith("Bearer "):
+                    token = auth_header.split(" ", 1)[1]
+                    claims = decode_authlib_jwt(token)
+                    if claims:
+                        user = get_user_by_id(claims["sub"])
+                    else:
+                        return jsonify({"status": "error", "message": "Invalid or expired Authlib JWT"}), 401
+                else:
+                    return jsonify({"status": "error", "message": "Missing authentication"}), 401
+
+        # Require verified user for API access
+        if not user or not user["is_verified"]:
+            return jsonify({"status": "error", "message": "Account not verified. Please complete OTP verification."}), 403
+
+        # Rate limiting
+        allowed, plan_limit = check_and_increment_rate_limit(user)
+        if not allowed:
+            return jsonify({
+                "status": "error",
+                "message": f"You have reached your daily quota for the '{user['plan']}' plan (limit: {plan_limit} requests per day). Please try again tomorrow or upgrade your plan.",
+                "plan": user["plan"],
+                "limit": plan_limit,
+                "requests_today": user["requests_today"]
+            }), 429
+
+        if not tmdb_id.isdigit():
+            print(f"❌ [API] Invalid TMDB ID format: {tmdb_id}")
+            return jsonify({"status": "error", "message": "Invalid TMDB ID"}), 400
+
+        print(f"🔍 [API] Checking cache for TMDB ID: {tmdb_id}")
+        cached = get_m3u8_url(tmdb_id)
+        if cached:
+            print(f"💾 [API] Found cached URL: {cached}")
             from utils import get_utc_now_iso
             return jsonify({
-                "status": "scraped", 
+                "status": "cached", 
                 "tmdb_id": tmdb_id, 
-                "m3u8_url": m3u8,
+                "m3u8_url": cached,
                 "timestamp": get_utc_now_iso()
             }), 200
-        else:
-            print(f"❌ [API] Scrape failed - no .m3u8 URL found")
+
+        print(f"🆕 [API] No cache found, starting fresh scrape...")
+        try:
+            url = f"{SCRAPE_BASE_URL}/movie/{tmdb_id}"
+            print(f"🌐 [API] Constructed URL: {url}")
+            print(f"🚀 [API] Calling scraper...")
+            
+            m3u8 = scrape_m3u8_url(url)
+            
+            if m3u8:
+                print(f"✅ [API] Scrape successful: {m3u8}")
+                print(f"💾 [API] Saving to cache...")
+                save_url(tmdb_id, m3u8)
+                print(f"✅ [API] Saved to cache successfully")
+                from utils import get_utc_now_iso
+                return jsonify({
+                    "status": "scraped", 
+                    "tmdb_id": tmdb_id, 
+                    "m3u8_url": m3u8,
+                    "timestamp": get_utc_now_iso()
+                }), 200
+            else:
+                print(f"❌ [API] Scrape failed - no .m3u8 URL found")
+                from utils import get_utc_now_iso
+                return jsonify({
+                    "status": "error", 
+                    "message": "No .m3u8 URL found",
+                    "timestamp": get_utc_now_iso()
+                }), 404
+        except Exception as e:
+            print(f"💥 [API] Exception during scrape: {e}")
+            print(f"💥 [API] Exception type: {type(e).__name__}")
             from utils import get_utc_now_iso
             return jsonify({
                 "status": "error", 
-                "message": "No .m3u8 URL found",
+                "message": str(e),
                 "timestamp": get_utc_now_iso()
-            }), 404
+            }), 500
     except Exception as e:
-        print(f"💥 [API] Exception during scrape: {e}")
-        print(f"💥 [API] Exception type: {type(e).__name__}")
-        from utils import get_utc_now_iso
-        return jsonify({
-            "status": "error", 
-            "message": str(e),
-            "timestamp": get_utc_now_iso()
-        }), 500
+        print(f"💥 [API] Main exception: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
 # Admin: change user plan
 @routes.route("/admin/change-plan", methods=["POST"])
 def admin_change_plan():
@@ -652,11 +658,15 @@ def admin_scrape_tmdb():
     
     if "user_id" not in session:
         print(f"❌ [ADMIN] No user session found")
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return {"status": "error", "message": "Not logged in"}, 401
         return redirect(url_for("routes.login"))
-        
+
     user = get_user_by_id(session["user_id"])
     if not user or not user["is_admin"]:
         print(f"❌ [ADMIN] User not admin or not found: {user}")
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return {"status": "error", "message": "Forbidden"}, 403
         return "Forbidden", 403
         
     print(f"✅ [ADMIN] Admin user verified: {user['email']}")
