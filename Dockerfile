@@ -1,28 +1,4 @@
-FROM python:3.11.9-slim
-
-# Install system dependencies for Playwright
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    curl \
-    ca-certificates \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    xdg-utils \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 # Set working directory
 WORKDIR /app
@@ -30,11 +6,11 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies and Playwright
-RUN pip install --no-cache-dir -r requirements.txt && pip install playwright
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install all Playwright browsers and dependencies
-RUN playwright install --with-deps
+# Verify Playwright installation
+RUN python -c "from playwright.sync_api import sync_playwright; print('Playwright installed successfully')"
 
 # Copy application code
 COPY . .
