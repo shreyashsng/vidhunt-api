@@ -9,7 +9,10 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Verify Playwright installation
+# ⬅️ Install browsers (Chromium, WebKit, Firefox)
+RUN playwright install --with-deps
+
+# (Optional) Verify Playwright installation
 RUN python -c "from playwright.sync_api import sync_playwright; print('Playwright installed successfully')"
 
 # Copy application code
