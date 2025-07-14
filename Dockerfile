@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # ⬅️ Install browsers (Chromium, WebKit, Firefox)
 RUN playwright install --with-deps
+RUN ls -la /ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # (Optional) Verify Playwright installation
 RUN python -c "from playwright.sync_api import sync_playwright; print('Playwright installed successfully')"
